@@ -1,12 +1,19 @@
 import React, { useRef } from "react";
 import styled, { keyframes } from "styled-components";
+import backImg from "./images/back.png";
+
+const ctx = require.context("./images", false, /img/);
+const keys = ctx.keys();
+const files = keys.map<any>(ctx).map(module => module.default as string);
+
+files.forEach(file => fetch(file));
 
 export interface Props {
-  classNames: string;
+  className: string;
   pairId: number;
   onTurn: () => void;
-  onAnimationEnd: () => void;
-  timeout: number;
+  onTransition: () => void;
+  animationDuration: number;
 }
 
 const Perspective = styled.div`
@@ -33,16 +40,16 @@ const bgCCW90 = keyframes`
   100% { transform: rotateY(0deg); }
 `;
 
-const Content = styled.div<Pick<Props, "pairId" | "timeout">>`
+const Content = styled.div<Pick<Props, "pairId" | "animationDuration">>`
   width: 144px;
   height: 192px;
   border-radius: 8px;
-  animation-duration: ${props => props.timeout}ms;
-  background-image: ${props => `url("./images/img${props.pairId + 1}.png");`};
+  animation-duration: ${props => props.animationDuration}ms;
+  background-image: ${props => `url("${files[props.pairId]}");`};
   background-size: 100%;
 
   &.bg {
-    background-image: url("./images/back.png");
+    background-image: url("${backImg}");
   }
 
   &.bg-cw90 {
@@ -66,31 +73,22 @@ const Content = styled.div<Pick<Props, "pairId" | "timeout">>`
   }
 `;
 
-const Card: React.VFC<Props> = ({ onTurn, timeout, classNames, pairId, onAnimationEnd }) => {
-  const duration = timeout / 2;
-  const stepCount = useRef(0);
+const Card: React.VFC<Props> = ({ onTurn, onTransition, ...rest }) => {
+  const step = useRef(0);
 
   const animationEnd = () => {
-    stepCount.current = (stepCount.current + 1) % 5;
-    onAnimationEnd();
+    if (!((++step.current % 5) % 2)) onTransition();
   };
 
-  const onMouseDown = () => {
-    if (!stepCount.current) {
-      stepCount.current++;
-      onTurn();
-    }
+  const mouseDown = () => {
+    if (step.current % 5) return;
+    step.current++;
+    onTurn();
   };
 
   return (
     <Perspective>
-      <Content
-        timeout={duration}
-        onMouseDown={onMouseDown}
-        className={classNames}
-        pairId={pairId}
-        onAnimationEnd={animationEnd}
-      />
+      <Content onMouseDown={mouseDown} onAnimationEnd={animationEnd} {...rest} />
     </Perspective>
   );
 };

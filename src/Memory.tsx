@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import styled from "styled-components";
 import Card from "./Card";
 import useMemory from "./useMemory";
 
-const DURATION = 700;
+const FLIP_DURATION = 400;
 
-const Container = styled.div`
+const Container = styled.main`
   height: 100vh;
   display: flex;
   justify-content: center;
@@ -20,7 +20,7 @@ const Grid = styled.div`
 `;
 
 const Memory: React.VFC = () => {
-  const { cards, classNames, turnCount, flip$, animationEnd$ } = useMemory({ duration: DURATION });
+  const { cards, classNames, turnCount, flip$, transition$ } = useMemory({ flipDuration: FLIP_DURATION });
 
   return (
     <Container>
@@ -28,11 +28,11 @@ const Memory: React.VFC = () => {
         {cards.map((pairId, i) => (
           <Card
             key={i}
-            classNames={classNames[i]}
+            className={classNames[i]}
             pairId={pairId}
             onTurn={() => flip$.next(i)}
-            timeout={DURATION}
-            onAnimationEnd={() => animationEnd$.next(i)}
+            animationDuration={FLIP_DURATION / 2}
+            onTransition={() => transition$.next(i)}
           />
         ))}
       </Grid>

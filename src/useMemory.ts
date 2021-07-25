@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Subject } from "rxjs";
 import * as Rx from "rxjs";
 import * as RxOp from "rxjs/operators";
@@ -6,13 +6,13 @@ import produce from "immer";
 
 interface Options {
   numPairs?: number;
-  duration?: number;
-  delay?: number;
+  flipDuration?: number;
+  coverDelay?: number;
 }
 
 const NUM_PAIRS = 8;
-const DURATION = 250;
-const DELAY = 0;
+const FLIP_DURATION = 250;
+const COVER_DELAY = 500;
 
 const shuffle = (numPairs: number) => {
   const temp = [...Array(2 * numPairs)].map((_, i) => i >> 1);
@@ -24,23 +24,30 @@ const shuffle = (numPairs: number) => {
   return shuffled;
 };
 
+const initializedClassNames = (numPairs: number) => [...Array(2 * numPairs)].fill("bg");
+
 const useMemory = (
-  { numPairs = NUM_PAIRS, duration = DURATION, delay = DELAY }: Options = {
+  { numPairs = NUM_PAIRS, flipDuration = FLIP_DURATION, coverDelay = COVER_DELAY }: Options = {
     numPairs: NUM_PAIRS,
-    duration: DURATION,
-    delay: DELAY,
+    flipDuration: FLIP_DURATION,
+    coverDelay: COVER_DELAY,
   }
 ) => {
   const [turnCount, setTurnCount] = useState<number>();
-  const [classNames, setClassNames] = useState<string[]>([...Array(2 * numPairs)].fill("bg"));
-  const statics = useRef({
-    cards: shuffle(numPairs),
-    flip$: new Subject<number>(),
-    animationEnd$: new Subject<number>(),
-  });
+  const [classNames, setClassNames] = useState<string[]>(initializedClassNames(numPairs));
+
+  const statics = useMemo(
+    () => ({
+      cards: shuffle(numPairs),
+      flip$: new Subject<number>(),
+      transition$: new Subject<number>(),
+    }),
+    [numPairs]
+  );
 
   useEffect(() => {
-    const { cards, flip$, animationEnd$ } = statics.current;
+    setClassNames(initializedClassNames(numPairs));
+    const { cards, flip$, transition$ } = statics;
 
     const updateCards = (value: string, ...indexes: number[]) => {
       setClassNames(
@@ -56,22 +63,22 @@ const useMemory = (
       .pipe(
         RxOp.tap(index => updateCards("bg-cw90 bg", index)),
         RxOp.mergeMap(index =>
-          animationEnd$.pipe(
+          transition$.pipe(
             RxOp.filter(src => index === src),
             RxOp.take(1),
             RxOp.tap(index => updateCards("fg-cw90", index)),
-            RxOp.delay(duration / 2)
+            RxOp.delay(flipDuration / 2)
           )
         ),
         RxOp.bufferCount(2),
-        RxOp.map(([a, b]) => ({ a, b, match: cards[a] === cards[b] })),
-        RxOp.mergeMap(({ a, b, match }) =>
+        RxOp.mergeMap(([a, b]) =>
           Rx.iif(
-            () => match,
+            () => cards[a] === cards[b],
             Rx.of(true).pipe(RxOp.tap(() => updateCards("match", a, b))),
             Rx.of(false).pipe(
+              RxOp.delay(coverDelay),
               RxOp.tap(() => updateCards("fg-ccw90", a, b)),
-              RxOp.delayWhen(() => animationEnd$.pipe(RxOp.filter(src => a === src))),
+              RxOp.delayWhen(() => transition$.pipe(RxOp.filter(src => a === src))),
               RxOp.tap(() => updateCards("bg-ccw90 bg", a, b))
             )
           )
@@ -86,9 +93,9 @@ const useMemory = (
     return () => {
       subscription.unsubscribe();
     };
-  }, [statics, setClassNames, duration, delay]);
+  }, [statics, setClassNames, flipDuration, coverDelay]);
 
-  return { classNames, turnCount, ...statics.current };
+  return { classNames, turnCount, ...statics };
 };
 
 export default useMemory;
