@@ -19,7 +19,8 @@ const shuffle = (numPairs: number) => {
   const shuffled: number[] = [];
   while (temp.length) {
     const index = ~~(Math.random() * temp.length);
-    shuffled.push(...temp.splice(index, 1));
+    const [pairId] = temp.splice(index, 1);
+    shuffled.push(pairId);
   }
   return shuffled;
 };
